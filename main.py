@@ -126,7 +126,7 @@ async def get_interface():
         <p id="status">Status: Unknown</p>
 
         <script>
-            const websocket = new WebSocket("ws://esp-control.onrender.com:80/ws");
+            const websocket = new WebSocket("wss://esp-control.onrender.com:443/ws");
 
             websocket.onmessage = function(event) {
                 const status = document.getElementById("status");
