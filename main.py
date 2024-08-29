@@ -6,9 +6,7 @@ from typing import List
 app = FastAPI()
 
 # CORS settings (allow requests from any origin)
-origins = [
-    "*",
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,35 +20,46 @@ app.add_middleware(
 esp_clients: List[WebSocket] = []
 web_clients: List[WebSocket] = []
 
-# WebSocket route to handle connections
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    client_host = websocket.client.host
+    print(f"New connection from {client_host}")
+
     await websocket.accept()
+    print(f"WebSocket connection accepted: {client_host}")
     
     try:
         # Wait for the client to send its identifier
         identifier = await websocket.receive_text()
-        
+        print(f"Received identifier from {client_host}: {identifier}")
+
         if identifier == "ESP32":
             esp_clients.append(websocket)
             print("ESP32 connected")
         else:
             web_clients.append(websocket)
             print("Web client connected")
-        
+
         while True:
+            # Receive a message from the client
             data = await websocket.receive_text()
+            print(f"Received message from {client_host}: {data}")
             
             if websocket in web_clients:
-                # Forward control messages to all ESP32 clients
+                print(f"Forwarding message from web client to ESP32 clients: {data}")
+                # Forward control messages from web clients to all ESP32 clients
                 for esp_client in esp_clients:
                     await esp_client.send_text(data)
+                    print(f"Sent message to ESP32: {data}")
             elif websocket in esp_clients:
-                # Broadcast messages from ESP32 to all web clients
+                print(f"Broadcasting message from ESP32 to web clients: {data}")
+                # Broadcast status messages from ESP32 to all web clients
                 for web_client in web_clients:
                     await web_client.send_text(data)
+                    print(f"Sent message to web client: {data}")
     
     except WebSocketDisconnect:
+        print(f"WebSocket disconnected: {client_host}")
         if websocket in esp_clients:
             esp_clients.remove(websocket)
             print("ESP32 disconnected")
@@ -61,11 +70,13 @@ async def websocket_endpoint(websocket: WebSocket):
 # Root path to verify the server is running
 @app.get("/")
 async def read_root():
+    print("Root path accessed")
     return {"message": "WebSocket Server Running"}
 
 # Web interface route
 @app.get("/interface", response_class=HTMLResponse)
 async def get_interface():
+    print("Web interface accessed")
     html_content = """
     <!DOCTYPE html>
     <html lang="en">
@@ -115,7 +126,7 @@ async def get_interface():
         <p id="status">Status: Unknown</p>
 
         <script>
-            const websocket = new WebSocket("ws://your-websocket-server-ip:80/ws");
+            const websocket = new WebSocket("ws://esp-control.onrender.com:80/ws");
 
             websocket.onmessage = function(event) {
                 const status = document.getElementById("status");
